@@ -1,6 +1,17 @@
 #!/bin/bash
-pacman -Syu
 
+# Logging
+trap 's=$?; echo "$0: Error on line "$LINENO": $BASH_COMMAND"; exit $s' ERR
+exec 1> >(tee "stdout.log")
+exec 2> >(tee "stderr.log")
+
+# Ensuring time is correct
+timedatectl set-ntp true
+
+# Installing dependencies
+pacman -Syyu dialog reflector --noconfirm
+
+# Setting variables
 echo -e "--- Setting variables ---\n"
 efi_size=513
 swap_size=$(($(free --mebi | awk '/Mem:/ {print $2}')/2))
@@ -12,12 +23,12 @@ echo "Enter password again:";read password2
 [[ "$password" == "$password2" ]] || ( echo "Passwords did not match"; exit 1; )
 
 
+# Partitioning disk
 echo -e "--- Disk partitioning ---\n"
 devicelist=$(lsblk -dplnx size -o name,size | grep -Ev "boot|rpmb|loop" | tac)
 device=$(dialog --stdout --menu "Select installation disk" 0 0 0 ${devicelist}) || exit 1
 partitionlist=$(lsblk -plnx size -o name,size | grep ${device} | tac)
 
-timedatectl set-ntp true
 
 # Partition disk
 echo "Partitioning disk"
@@ -42,6 +53,9 @@ mount "${part_root}" /mnt
 mkdir /mnt/boot
 mount "${part_boot}" /mnt/boot
 
+# Updating mirrorlist
+reflector -c "LT" -f 12 -l 10 -n 12 --save /mnt/etc/pacman.d/mirrorlist
+
 # Install packages
 echo "Installing packages"
 pacstrap /mnt base base-devel linux-zen linux-zen-headers nano dhcpcd dhcp refind
@@ -60,22 +74,7 @@ echo "Setting up locale"
 arch-chroot /mnt sed 's/#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' < /etc/locale.gen >> /etc/locale.gen
 arch-chroot /mnt sed 's/#en_US ISO-8859-1/en_US ISO-8859-1/' < /etc/locale.gen >> /etc/locale.gen
 arch-chroot /mnt locale-gen
-arch-chroot /mnt cat <<EOF > /etc/locale.conf
-LANG=en_US.UTF-8
-LC_CTYPE="en_US.UTF-8"
-LC_NUMERIC="en_US.UTF-8"
-LC_TIME="en_US.UTF-8"
-LC_COLLATE="en_US.UTF-8"
-LC_MONETARY="en_US.UTF-8"
-LC_MESSAGES="en_US.UTF-8"
-LC_PAPER="en_US.UTF-8"
-LC_NAME="en_US.UTF-8"
-LC_ADDRESS="en_US.UTF-8"
-LC_TELEPHONE="en_US.UTF-8"
-LC_MEASUREMENT="en_US.UTF-8"
-LC_IDENTIFICATION="en_US.UTF-8"
-LC_ALL=
-EOF
+arch-chroot /mnt echo "LANG=en_US.UTF-8" > /etc/locale.conf
 
 # Set hostname
 echo "Setting hostname"
@@ -98,7 +97,7 @@ echo "root:$password" | chpasswd --root /mnt
 
 # Install bootloader
 echo "Installing bootloader"
-arch-chroot /mnt refind-install
+arch-chroot /mnt refind-install --usedefault ${part_boot}
 
 # Install desktop environment
 echo "Installing desktop environment and display manager"
