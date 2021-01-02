@@ -28,9 +28,6 @@ devicelist=$(lsblk -dplnx size -o name,size | grep -Ev "boot|rpmb|loop" | tac)
 device=$(dialog --stdout --menu "Select installation disk" 0 0 0 ${devicelist}) || exit 1
 partitionlist=$(lsblk -plnx size -o name,size | grep ${device} | tac)
 
-
-# Partition disk
-echo "Partitioning disk"
 parted --script "${device}" -- mklabel gpt \
   mkpart ESP fat32 1Mib ${efi_size}MiB \
   set 1 boot on \
@@ -71,18 +68,18 @@ arch-chroot /mnt hwclock --systohc
 
 # Set up locale
 echo "Setting up locale"
-arch-chroot /mnt echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
-arch-chroot /mnt echo "en_US ISO-8859-1" >> /etc/locale.gen
+echo "en_US.UTF-8 UTF-8" >> /mnt/etc/locale.gen
+echo "en_US ISO-8859-1" >> /mnt/etc/locale.gen
 arch-chroot /mnt locale-gen
-arch-chroot /mnt echo "LANG=en_US.UTF-8" > /etc/locale.conf
+echo "LANG=en_US.UTF-8" > /mnt/etc/locale.conf
 
 # Set hostname
 echo "Setting hostname"
-arch-chroot /mnt echo $(hostname) > /etc/hostname
+echo $(hostname) > /mnt/etc/hostname
 
 # Network configuration
 echo "Configuring network"
-arch-chroot /mnt cat <<EOF > /etc/hosts
+cat <<EOF > /mnt/etc/hosts
 127.0.0.1	localhost
 ::1	localhost
 127.0.1.1	${hostname}.localdomain	${hostname}
