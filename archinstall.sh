@@ -13,9 +13,8 @@ pacman -Syyu dialog reflector --noconfirm
 
 # Setting variables
 echo -e "--- Setup ---\n"
-efi_size=513
 swap_size=$(($(free --mebi | awk '/Mem:/ {print $2}')/2))
-swap_end=$(( $swap_size + ${efi_size} + 1 ))MiB
+swap_end=$(($swap_size+512))MiB
 echo "Enter hostname:";read hostname
 echo "Enter username:";read username
 echo "Enter password:";read password
@@ -29,20 +28,15 @@ devicelist=$(lsblk -dplnx size -o name,size | grep -Ev "boot|rpmb|loop" | tac)
 device=$(dialog --stdout --menu "Select installation disk" 0 0 0 ${devicelist}) || exit 1
 
 parted --script "${device}" -- mklabel gpt \
-  mkpart ESP fat32 1Mib ${efi_size}MiB \
+  mkpart "EFI" fat32 1Mib 512MiB \
   set 1 esp on \
-  mkpart primary linux-swap ${efi_size}MiB ${swap_end} \
-  mkpart primary ext4 ${swap_end} 100%
+  mkpart "swap" linux-swap 512MiB ${swap_end} \
+  mkpart "root" ext4 ${swap_end} 100%
 
 partitionlist=$(lsblk -plnx size -o name,size | grep ${device} | tac)
 part_boot=$(dialog --stdout --menu "Select boot partition" 0 0 0 ${partitionlist}) || exit 1
 part_swap=$(dialog --stdout --menu "Select swap partition" 0 0 0 ${partitionlist}) || exit 1
 part_root=$(dialog --stdout --menu "Select root partition" 0 0 0 ${partitionlist}) || exit 1
-
-# Wipe filesystems
-wipefs ${part_boot}
-wipefs ${part_root}
-wipefs ${part_swap}
 
 # Make and mount partitions
 echo "Making and mounting partitions"
@@ -63,6 +57,7 @@ cp /etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist
 # Install packages
 echo "Installing packages"
 pacstrap /mnt base base-devel linux-zen linux-zen-headers nano dhcpcd dhcp refind
+# Install wifi packages if wifi is available
 [[ $(ip link) == *"wlan"* ]] && pacstrap /mnt iw iwd wpa_supplicant netctl dialog
 
 # Generate fstab
@@ -99,8 +94,8 @@ echo "Adding user"
 arch-chroot /mnt useradd -mU -G wheel "$username"
 echo "$username:$password" | chpasswd --root /mnt
 echo "root:$password" | chpasswd --root /mnt
-read -n 1 -s -r -p "Uncomment %wheel ALL=(ALL) ALL to add ${username} to sudoers"; nano /mnt/etc/sudoers
-
+read -n 1 -s -r -p "Uncomment %wheel ALL=(ALL) ALL to add ${username} to sudoers"
+arch-chroot /mnt nano /etc/sudoers
 
 # Install desktop environment
 echo "Installing desktop environment and display manager"
