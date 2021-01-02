@@ -15,7 +15,7 @@ exec 2> >(tee "stderr.log")
 timedatectl set-ntp true
 
 # Installing dependencies
-pacman -Syyu dialog reflector --noconfirm
+pacman -Syyu --noconfirm dialog reflector
 
 # Setting variables
 echo -e "--- Setup ---\n"
@@ -72,29 +72,29 @@ cp /etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist
 
 # Install packages
 echo "Installing packages"
-pacstrap /mnt base base-devel linux-zen linux-zen-headers nano dhcpcd dhcp konsole ark dolphin discord git mpv nomacs 
+pacstrap /mnt base base-devel nano dhcpcd dhcp konsole ark dolphin discord git mpv nomacs 
 # Install wifi packages if wifi is available
 [[ $(ip link) == *"wlan"* ]] && pacstrap /mnt iw iwd wpa_supplicant netctl dialog
 # Install appropriate bootloader
 if [ $EFI == "y"* ]; then
 	pacstrap /mnt refind
 else
-	pacstrap /mnt grub
+	pacstrap /mnt grub grub-customizer
 fi
 
 # Edit pacman.conf to enable multilib
 arch-chroot /mnt sed -i '95s/#[multilib]/[multilib]/' /etc/pacman.conf
 arch-chroot /mnt sed -i '96s/#Include = \/etc\/pacman.d\/mirrorlist/Include = \/etc\/pacman.d\/mirrorlist/' /etc/pacman.conf
-arch-chroot /mnt pacman -Syyu
+arch-chroot /mnt pacman -Syyu --noconfirm
 
 # Install GPU drivers
 if [ $GPU == "amd" ]; then
-	arch-chroot /mnt pacman -S lib32-mesa mesa vulkan-radeon xf86-video-amdgpu
+	arch-chroot /mnt pacman -S --noconfirm linux-zen linux-zen-headers linux-firmware lib32-mesa mesa vulkan-radeon xf86-video-amdgpu
 elif [ $GPU == "nvidia" ]; then
-	arch-chroot /mnt pacman -S nvidia lib32-nvidia-utils
+	arch-chroot /mnt pacman -S --noconfirm linux linux-headers linux-firmware nvidia
 	arch-chroot /mnt nvidia-xconfig
 elif [ $GPU == "intel" ]; then
-	arch-chroot /mnt pacman -S mesa lib32-mesa vulkan-intel
+	arch-chroot /mnt pacman -S --noconfirm linux-zen linux-zen-headers linux-firmware mesa lib32-mesa vulkan-intel
 fi
 
 
@@ -135,7 +135,7 @@ echo "root:$password" | chpasswd --root /mnt
 
 # Install desktop environment
 echo "Installing desktop environment and display manager"
-arch-chroot /mnt pacman -S plasma sddm --noconfirm
+arch-chroot /mnt pacman -S --noconfirm plasma sddm
 arch-chroot /mnt systemctl enable sddm
 
 # Install bootloader
