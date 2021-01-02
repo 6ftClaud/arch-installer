@@ -1,10 +1,6 @@
 #!/bin/bash
-
-# Install script for an EFI system.
 # Warning: the script wipes the entire disk
 
-# amd
-# mesa vulkan-radeon xf86-video-amdgpu
 
 # Logging
 trap 's=$?; echo "$0: Error on line "$LINENO": $BASH_COMMAND"; exit $s' ERR
