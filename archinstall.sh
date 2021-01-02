@@ -2,7 +2,6 @@
 
 # Logging
 trap 's=$?; echo "$0: Error on line "$LINENO": $BASH_COMMAND"; exit $s' ERR
-exec 1> >(tee "stdout.log")
 exec 2> >(tee "stderr.log")
 
 # Ensuring time is correct
@@ -54,6 +53,7 @@ mkdir /mnt/boot
 mount "${part_boot}" /mnt/boot
 
 # Updating mirrorlist
+mkdir /mnt/etc;mkdir /mnt/etc/pacman.d
 reflector -c "LT" -f 12 -l 10 -n 12 --save /mnt/etc/pacman.d/mirrorlist
 
 # Install packages
@@ -71,8 +71,8 @@ arch-chroot /mnt hwclock --systohc
 
 # Set up locale
 echo "Setting up locale"
-arch-chroot /mnt sed 's/#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' < /etc/locale.gen >> /etc/locale.gen
-arch-chroot /mnt sed 's/#en_US ISO-8859-1/en_US ISO-8859-1/' < /etc/locale.gen >> /etc/locale.gen
+arch-chroot /mnt echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
+arch-chroot /mnt echo "en_US ISO-8859-1" >> /etc/locale.gen
 arch-chroot /mnt locale-gen
 arch-chroot /mnt echo "LANG=en_US.UTF-8" > /etc/locale.conf
 
@@ -103,3 +103,12 @@ arch-chroot /mnt refind-install --usedefault ${part_boot}
 echo "Installing desktop environment and display manager"
 arch-chroot /mnt pacman -Syu plasma sddm --noconfirm
 arch-chroot /mnt systemctl enable sddm
+
+# Unmount partitions
+umount $part_boot
+umount $part_root
+swapoff $part_swap
+
+# End install
+[ -s stderr.log ] && echo "Something went wrong during install, check stderr.log" || \
+read -p -e "Installed successfully.\nPress enter to reboot." && reboot
