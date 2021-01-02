@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Install script for an EFI system.
+# Warning: the script wipes the entire disk
+
+
 # Logging
 trap 's=$?; echo "$0: Error on line "$LINENO": $BASH_COMMAND"; exit $s' ERR
 exec 1> >(tee "stdout.log")
@@ -20,18 +24,28 @@ echo "Enter username:";read username
 echo "Enter password:";read password
 echo "Enter password again:";read password2
 [[ "$password" == "$password2" ]] || ( echo "Passwords did not match"; exit 1; )
-
+echo "Use EFI mode? (y, n):";read EFI
 
 # Partitioning disk
 echo -e "--- Disk partitioning ---\n"
 devicelist=$(lsblk -dplnx size -o name,size | grep -Ev "boot|rpmb|loop" | tac)
 device=$(dialog --stdout --menu "Select installation disk" 0 0 0 ${devicelist}) || exit 1
 
-parted --script "${device}" -- mklabel gpt \
-  mkpart "EFI" fat32 1Mib 512MiB \
-  set 1 esp on \
-  mkpart "swap" linux-swap 512MiB ${swap_end} \
-  mkpart "root" ext4 ${swap_end} 100%
+if [ $EFI == "y" ]; then
+	parted --script "${device}" -- mklabel gpt \
+	  mkpart "EFI" fat32 1Mib 512MiB \
+	  set 1 esp on \
+	  mkpart "swap" linux-swap 512MiB ${swap_end} \
+	  mkpart "root" ext4 ${swap_end} 100%
+else
+	parted --script "${device}" -- mklabel gpt \
+	  mkpart "bios_grub" fat32 1Mib 3Mib \
+	  set 1 bios_grub on \
+	  mkpart "boot" fat32 3Mib 515MiB \
+	  set 2 boot on \
+	  mkpart "swap" linux-swap 515MiB $((${swap_end}+3)) \
+	  mkpart "root" ext4 $((${swap_end}+3)) 100%
+fi
 
 partitionlist=$(lsblk -plnx size -o name,size | grep ${device} | tac)
 part_boot=$(dialog --stdout --menu "Select boot partition" 0 0 0 ${partitionlist}) || exit 1
@@ -56,9 +70,15 @@ cp /etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist
 
 # Install packages
 echo "Installing packages"
-pacstrap /mnt base base-devel linux-zen linux-zen-headers nano dhcpcd dhcp refind
+pacstrap /mnt base base-devel linux-zen linux-zen-headers nano dhcpcd dhcp
 # Install wifi packages if wifi is available
 [[ $(ip link) == *"wlan"* ]] && pacstrap /mnt iw iwd wpa_supplicant netctl dialog
+# Install appropriate bootloader
+if [ $EFI == "y"* ]; then
+	pacstrap /mnt refind
+else
+	pacstrap /mnt grub
+fi
 
 # Generate fstab
 echo "Generating fstab"
@@ -80,7 +100,7 @@ echo "LANG=en_US.UTF-8" > /mnt/etc/locale.conf
 echo "Setting hostname"
 echo $(hostname) > /mnt/etc/hostname
 
-# Network configuration
+# Network (ethernet) configuration
 echo "Configuring network"
 cat <<EOF > /mnt/etc/hosts
 127.0.0.1	localhost
@@ -103,11 +123,16 @@ arch-chroot /mnt pacman -Syu plasma sddm --noconfirm
 arch-chroot /mnt systemctl enable sddm
 
 # Install bootloader
-echo -e "\nInstall rEFInd with refind-install"
-arch-chroot /mnt
+if [ $EFI == "y" ]; then
+	echo -e "\nInstall rEFInd with refind-install"
+	arch-chroot /mnt
+else
+	echo -e "\nInstall GRUB with grub-install --target=i386-pc ${device}\ngrub-mkconfig -o /boot/grub/grub.cfg"
+	arch-chroot /mnt
+fi
 
 # End install
 cp stderr.log /mnt/home/${username}/Install_Errors.log
 cp stdout.log /mnt/home/${username}/Install_Log.log
 [ -s stderr.log ] && echo "Something went wrong during install, check stderr.log" \
-|| echo -e "\nInstalled successfully." && sleep 3s && reboot
+|| echo -e "\nInstalled successfully."
