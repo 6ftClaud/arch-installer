@@ -3,6 +3,8 @@
 # Install script for an EFI system.
 # Warning: the script wipes the entire disk
 
+# amd
+# mesa vulkan-radeon xf86-video-amdgpu
 
 # Logging
 trap 's=$?; echo "$0: Error on line "$LINENO": $BASH_COMMAND"; exit $s' ERR
@@ -17,13 +19,13 @@ pacman -Syyu dialog reflector --noconfirm
 
 # Setting variables
 echo -e "--- Setup ---\n"
-swapsize=$(cat /proc/meminfo | grep MemTotal | awk '{ print $2 }')
-swapsize=$((${swapsize}/1000))"M"
+swapsize=$(($(cat /proc/meminfo | grep MemTotal | awk '{ print $2 }')/2000))"M"
 echo "Enter hostname:";read hostname
 echo "Enter username:";read username
 echo "Enter password:";read password
 echo "Enter password again:";read password2
 [[ "$password" == "$password2" ]] || ( echo "Passwords did not match"; exit 1; )
+echo "Which GPU is being used? (amd, nvidia, intel):"; read GPU
 echo "Use EFI mode? (y, n):";read EFI
 
 # Partitioning disk
@@ -41,7 +43,7 @@ if [ $EFI == "y" ]; then
 else
 	# BIOS
 	parted ${device} mklabel gpt
-	sgdisk ${device} -n=1:0:+31M -t=1:ef02
+	sgdisk ${device} -n=1:0:+32M -t=1:ef02
 	sgdisk ${device} -n=2:0:+512M
 	sgdisk ${device} -n=3:0:+${swapsize} -t=3:8200
 	sgdisk ${device} -n=4:0:0
@@ -70,7 +72,7 @@ cp /etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist
 
 # Install packages
 echo "Installing packages"
-pacstrap /mnt base base-devel linux-zen linux-zen-headers nano dhcpcd dhcp konsole ark dolphin google-chrome discord git mpv nomacs 
+pacstrap /mnt base base-devel linux-zen linux-zen-headers nano dhcpcd dhcp konsole ark dolphin discord git mpv nomacs 
 # Install wifi packages if wifi is available
 [[ $(ip link) == *"wlan"* ]] && pacstrap /mnt iw iwd wpa_supplicant netctl dialog
 # Install appropriate bootloader
@@ -79,6 +81,22 @@ if [ $EFI == "y"* ]; then
 else
 	pacstrap /mnt grub
 fi
+
+# Edit pacman.conf to enable multilib
+arch-chroot /mnt sed -i '95s/#[multilib]/[multilib]/' /etc/pacman.conf
+arch-chroot /mnt sed -i '96s/#Include = \/etc\/pacman.d\/mirrorlist/Include = \/etc\/pacman.d\/mirrorlist/' /etc/pacman.conf
+arch-chroot /mnt pacman -Syyu
+
+# Install GPU drivers
+if [ $GPU == "amd" ]; then
+	arch-chroot /mnt pacman -S lib32-mesa mesa vulkan-radeon xf86-video-amdgpu
+elif [ $GPU == "nvidia" ]; then
+	arch-chroot /mnt pacman -S nvidia lib32-nvidia-utils
+	arch-chroot /mnt nvidia-xconfig
+elif [ $GPU == "intel" ]; then
+	arch-chroot /mnt pacman -S mesa lib32-mesa vulkan-intel
+fi
+
 
 # Generate fstab
 echo "Generating fstab"
@@ -98,7 +116,7 @@ echo "LANG=en_US.UTF-8" > /mnt/etc/locale.conf
 
 # Set hostname
 echo "Setting hostname"
-echo $(hostname) > /mnt/etc/hostname
+echo $hostname > /mnt/etc/hostname
 
 # Network (ethernet) configuration
 echo "Configuring network"
@@ -117,13 +135,12 @@ echo "root:$password" | chpasswd --root /mnt
 
 # Install desktop environment
 echo "Installing desktop environment and display manager"
-arch-chroot /mnt pacman -Syu plasma sddm --noconfirm
+arch-chroot /mnt pacman -S plasma sddm --noconfirm
 arch-chroot /mnt systemctl enable sddm
 
 # Install bootloader
 if [ $EFI == "y" ]; then
-	echo -e "\nInstall rEFInd with refind-install"
-	arch-chroot /mnt
+	arch-chroot /mnt refind-install
 else
 	arch-chroot /mnt grub-install --target=i386-pc ${device}
 	arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
