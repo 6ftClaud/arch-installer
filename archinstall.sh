@@ -5,7 +5,6 @@ clear
 echo -e "--- Setting variables ---\n"
 
 efi_size=512
-# swap size = memory / 2
 swap_size=$(($(free --mebi | awk '/Mem:/ {print $2}')/2))
 swap_end=$(( $swap_size + ${efi_size} + 1 ))MiB
 
@@ -31,7 +30,7 @@ echo "Partitioning disk"
 parted --script "${device}" -- mklabel gpt \
   mkpart ESP fat32 1Mib ${efi_size}MiB \
   set 1 boot on \
-  mkpart primary linux-swap ${efi_size} ${swap_end} \
+  mkpart primary linux-swap $((${efi_size} + 2))MiB ${swap_end} \
   mkpart primary ext4 ${swap_end} 100%
 
 part_boot=$(dialog --stdout --menu "Select boot partition" 0 0 0 ${partitionlist}) || exit 1
@@ -85,7 +84,7 @@ arch-chroot /mnt systemctl enable dhcpcd
 # Add user
 echo "Adding user"
 arch-chroot /mnt useradd -mU -G wheel "$username"
-echo "$user:$password" | chpasswd --root /mnt
+echo "$username:$password" | chpasswd --root /mnt
 echo "root:$password" | chpasswd --root /mnt
 
 # Install bootloader
