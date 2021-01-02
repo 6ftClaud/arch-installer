@@ -1,5 +1,5 @@
 #!/bin/bash
-
+pacman -Syu
 
 echo -e "--- Setting variables ---\n"
 efi_size=513
