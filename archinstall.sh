@@ -38,13 +38,10 @@ if [ $EFI == "y" ]; then
 	  mkpart "swap" linux-swap 512MiB ${swap_end} \
 	  mkpart "root" ext4 ${swap_end} 100%
 else
-	parted --script "${device}" -- mklabel gpt \
-	  mkpart "bios_grub" fat32 1Mib 3Mib \
-	  set 1 bios_grub on \
-	  mkpart "boot" fat32 3Mib 515MiB \
-	  set 2 boot on \
-	  mkpart "swap" linux-swap 515MiB $((${swap_end}+3)) \
-	  mkpart "root" ext4 $((${swap_end}+3)) 100%
+	sgdisk ${device} -n=1:0:+31M -t=1:ef02
+	sgdisk ${device} -n=2:0:+512M
+	sgdisk ${device} -n=3:0:+${swapsize} -t=3:8200
+	sgdisk ${device} -n=4:0:0
 fi
 
 partitionlist=$(lsblk -plnx size -o name,size | grep ${device} | tac)
