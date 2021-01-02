@@ -2,6 +2,7 @@
 
 # Logging
 trap 's=$?; echo "$0: Error on line "$LINENO": $BASH_COMMAND"; exit $s' ERR
+exec 1> >(tee "stdout.log")
 exec 2> >(tee "stderr.log")
 
 # Ensuring time is correct
@@ -11,7 +12,7 @@ timedatectl set-ntp true
 pacman -Syyu dialog reflector --noconfirm
 
 # Setting variables
-echo -e "--- Setting variables ---\n"
+echo -e "--- Setup ---\n"
 efi_size=513
 swap_size=$(($(free --mebi | awk '/Mem:/ {print $2}')/2))
 swap_end=$(( $swap_size + ${efi_size} + 1 ))MiB
@@ -61,7 +62,8 @@ cp /etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist
 
 # Install packages
 echo "Installing packages"
-pacstrap /mnt base base-devel linux-zen linux-zen-headers nano dhcpcd dhcp refind cronie mpv nomacs
+pacstrap /mnt base base-devel linux-zen linux-zen-headers nano dhcpcd dhcp refind
+[[ $(ip link) == *"wlan"* ]] && pacstrap /mnt iw iwd wpa_supplicant netctl dialog
 
 # Generate fstab
 echo "Generating fstab"
@@ -97,16 +99,20 @@ echo "Adding user"
 arch-chroot /mnt useradd -mU -G wheel "$username"
 echo "$username:$password" | chpasswd --root /mnt
 echo "root:$password" | chpasswd --root /mnt
-
-# Install bootloader
-echo "Installing bootloader"
-arch-chroot /mnt refind-install
+# Add user to sudoers
+arch-chroot /mnt usermod -a -G sudo "$username"
 
 # Install desktop environment
 echo "Installing desktop environment and display manager"
 arch-chroot /mnt pacman -Syu plasma sddm --noconfirm
 arch-chroot /mnt systemctl enable sddm
 
+# Install bootloader
+echo -e "\nInstall rEFInd with refind-install"
+arch-chroot /mnt
+
 # End install
-cp stderr.log /mnt/home/${username}/
-[ -s stderr.log ] && echo "Something went wrong during install, check stderr.log" || read -p -e "Installed successfully.\nPress enter to reboot." && reboot
+cp stderr.log /mnt/home/${username}/Install_Errors.log
+cp stdout.log /mnt/home/${username}/Install_Log.log
+[ -s stderr.log ] && echo "Something went wrong during install, check stderr.log" \
+|| read -p "Installed successfully. Press enter to reboot." && reboot
