@@ -17,8 +17,8 @@ pacman -Syyu dialog reflector --noconfirm
 
 # Setting variables
 echo -e "--- Setup ---\n"
-swap_size=$(($(free --mebi | awk '/Mem:/ {print $2}')/2))
-swap_end=$(($swap_size+512))MiB
+swapsize=$(cat /proc/meminfo | grep MemTotal | awk '{ print $2 }')
+swapsize=$((${swapsize}/1000))"M"
 echo "Enter hostname:";read hostname
 echo "Enter username:";read username
 echo "Enter password:";read password
@@ -31,13 +31,16 @@ echo -e "--- Disk partitioning ---\n"
 devicelist=$(lsblk -dplnx size -o name,size | grep -Ev "boot|rpmb|loop" | tac)
 device=$(dialog --stdout --menu "Select installation disk" 0 0 0 ${devicelist}) || exit 1
 
+wipefs -a ${device}
 if [ $EFI == "y" ]; then
-	parted --script "${device}" -- mklabel gpt \
-	  mkpart "EFI" fat32 1Mib 512MiB \
-	  set 1 esp on \
-	  mkpart "swap" linux-swap 512MiB ${swap_end} \
-	  mkpart "root" ext4 ${swap_end} 100%
+	# EFI
+	parted ${device} mklabel gpt
+	sgdisk ${device} -n=1:0:+1024M -t=1:ef00
+	sgdisk ${device} -n=2:0:+${swapsize} -t=2:8200
+	sgdisk ${device} -n=3:0:0
 else
+	# BIOS
+	parted ${device} mklabel gpt
 	sgdisk ${device} -n=1:0:+31M -t=1:ef02
 	sgdisk ${device} -n=2:0:+512M
 	sgdisk ${device} -n=3:0:+${swapsize} -t=3:8200
@@ -67,7 +70,7 @@ cp /etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist
 
 # Install packages
 echo "Installing packages"
-pacstrap /mnt base base-devel linux-zen linux-zen-headers nano dhcpcd dhcp
+pacstrap /mnt base base-devel linux-zen linux-zen-headers nano dhcpcd dhcp konsole ark dolphin google-chrome discord git mpv nomacs 
 # Install wifi packages if wifi is available
 [[ $(ip link) == *"wlan"* ]] && pacstrap /mnt iw iwd wpa_supplicant netctl dialog
 # Install appropriate bootloader
@@ -111,8 +114,6 @@ echo "Adding user"
 arch-chroot /mnt useradd -mU -G wheel "$username"
 echo "$username:$password" | chpasswd --root /mnt
 echo "root:$password" | chpasswd --root /mnt
-read -n 1 -s -r -p "Uncomment %wheel ALL=(ALL) ALL to add ${username} to sudoers"
-arch-chroot /mnt nano /etc/sudoers
 
 # Install desktop environment
 echo "Installing desktop environment and display manager"
@@ -124,12 +125,13 @@ if [ $EFI == "y" ]; then
 	echo -e "\nInstall rEFInd with refind-install"
 	arch-chroot /mnt
 else
-	echo -e "\nInstall GRUB with grub-install --target=i386-pc ${device}\ngrub-mkconfig -o /boot/grub/grub.cfg"
-	arch-chroot /mnt
+	arch-chroot /mnt grub-install --target=i386-pc ${device}
+	arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
 fi
 
 # End install
 cp stderr.log /mnt/home/${username}/Install_Errors.log
 cp stdout.log /mnt/home/${username}/Install_Log.log
+echo "Uncomment %wheel ALL=(ALL) ALL to add ${username} to sudoers"
 [ -s stderr.log ] && echo "Something went wrong during install, check stderr.log" \
 || echo -e "\nInstalled successfully."
