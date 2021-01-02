@@ -99,8 +99,8 @@ echo "Adding user"
 arch-chroot /mnt useradd -mU -G wheel "$username"
 echo "$username:$password" | chpasswd --root /mnt
 echo "root:$password" | chpasswd --root /mnt
-# Add user to sudoers
-arch-chroot /mnt usermod -a -G sudo "$username"
+read -n 1 -s -r -p "Uncomment %wheel ALL=(ALL) ALL to add ${username} to sudoers"; nano /mnt/etc/sudoers
+
 
 # Install desktop environment
 echo "Installing desktop environment and display manager"
@@ -115,4 +115,4 @@ arch-chroot /mnt
 cp stderr.log /mnt/home/${username}/Install_Errors.log
 cp stdout.log /mnt/home/${username}/Install_Log.log
 [ -s stderr.log ] && echo "Something went wrong during install, check stderr.log" \
-|| read -p "Installed successfully. Press enter to reboot." && reboot
+|| echo -e "\nInstalled successfully." && sleep 3s && reboot
