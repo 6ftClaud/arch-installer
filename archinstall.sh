@@ -33,10 +33,16 @@ parted --script "${device}" -- mklabel gpt \
   set 1 boot on \
   mkpart primary linux-swap ${efi_size}MiB ${swap_end} \
   mkpart primary ext4 ${swap_end} 100%
+sleep 2s
 
 part_boot=$(dialog --stdout --menu "Select boot partition" 0 0 0 ${partitionlist}) || exit 1
 part_swap=$(dialog --stdout --menu "Select swap partition" 0 0 0 ${partitionlist}) || exit 1
 part_root=$(dialog --stdout --menu "Select root partition" 0 0 0 ${partitionlist}) || exit 1
+
+# Wipe filesystems
+wipefs ${part_boot}
+wipefs ${part_root}
+wipefs ${part_swap}
 
 # Make and mount partitions
 echo "Making and mounting partitions"
@@ -50,8 +56,9 @@ mkdir /mnt/boot
 mount "${part_boot}" /mnt/boot
 
 # Updating mirrorlist
+reflector -c "LT" -f 12 -l 10 -n 12 --save /etc/pacman.d/mirrorlist
 mkdir /mnt/etc;mkdir /mnt/etc/pacman.d
-reflector -c "LT" -f 12 -l 10 -n 12 --save /mnt/etc/pacman.d/mirrorlist
+cp /etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist
 
 # Install packages
 echo "Installing packages"
@@ -107,5 +114,4 @@ umount $part_root
 swapoff $part_swap
 
 # End install
-[ -s stderr.log ] && echo "Something went wrong during install, check stderr.log" || \
-read -p -e "Installed successfully.\nPress enter to reboot." && reboot
+[ -s stderr.log ] && echo "Something went wrong during install, check stderr.log" || read -p -e "Installed successfully.\nPress enter to reboot." && reboot
