@@ -11,7 +11,7 @@ exec 2> >(tee "stderr.log")
 timedatectl set-ntp true
 
 # Installing dependencies
-pacman -Syyu --noconfirm dialog reflector
+pacman -Sy --noconfirm dialog reflector
 
 # Setting variables
 swapsize=$(($(cat /proc/meminfo | grep MemTotal | awk '{ print $2 }')/2000))"M"
@@ -68,7 +68,8 @@ cp /etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist
 # Install base packages
 pacstrap /mnt base base-devel linux-firmware
 # Install wifi packages if wifi is available
-[[ $(ip link) == *"wlan"* ]] && pacstrap /mnt iw iwd wpa_supplicant netctl dialog
+[[ $(ip link) == *"wlan"* ]] && pacstrap /mnt iw iwd wpa_supplicant netctl dialog networkmanager \
+&& systemctl enable networkmanager
 # Install appropriate bootloader
 if [ $EFI == 0 ]; then
 	pacstrap /mnt refind
@@ -131,10 +132,15 @@ echo "root:$password" | chpasswd --root /mnt
 echo "Installing desktop environment and display manager"
 arch-chroot /mnt pacman -S --noconfirm plasma sddm
 arch-chroot /mnt systemctl enable sddm
-
+arch-chroot /mnt 
 # Install bootloader
 if [ $EFI == 0 ]; then
 	arch-chroot /mnt refind-install
+	UUID=$(arch-chroot /mnt findmnt -no UUID /)
+	> /mnt/boot/refind_linux.conf
+	echo "\"Boot with standard options\"  \"root=UUID=$UUID rw quiet loglevel=3\"" >> /mnt/boot/refind_linux.conf
+	echo "\"Boot to single-user mode\"    \"root=UUID=$UUID rw quiet loglevel=3 single\"" >> /mnt/boot/refind_linux.conf
+	echo "\"Boot with minimal options\"   \"ro root=$part_root\"" >> /mnt/boot/refind_linux.conf
 else
 	arch-chroot /mnt grub-install --target=i386-pc ${device}
 	arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
@@ -147,3 +153,5 @@ echo "Uncomment %wheel ALL=(ALL) ALL to add ${username} to sudoers"
 [ -s stderr.log ] && echo "Something went wrong during install, check stderr.log" \
 || echo -e "\nInstalled successfully."
 echo -e "Logs are located at /home/${username}/.\nScript's work here is done."
+
+echo "\"Boot with standard options\"  \"root=UUID=655dbc90-2079-4566-b8f6-3c8649d89c74\""
