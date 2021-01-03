@@ -35,6 +35,9 @@ if [ $EFI == 0 ]; then
 	sgdisk ${device} -n=1:0:+1024M -t=1:ef00
 	sgdisk ${device} -n=2:0:+${swapsize} -t=2:8200
 	sgdisk ${device} -n=3:0:0
+	part_boot=${device}1
+	part_swap=${device}2
+	part_root=${device}3
 else
 	# BIOS
 	parted ${device} mklabel gpt
@@ -42,12 +45,10 @@ else
 	sgdisk ${device} -n=2:0:+512M
 	sgdisk ${device} -n=3:0:+${swapsize} -t=3:8200
 	sgdisk ${device} -n=4:0:0
+	part_boot=${device}2
+	part_swap=${device}3
+	part_root=${device}4
 fi
-
-partitionlist=$(lsblk -plnx size -o name,size | grep ${device} | tac)
-part_boot=$(dialog --stdout --menu "Select boot partition" 0 0 0 ${partitionlist}) || exit 1
-part_swap=$(dialog --stdout --menu "Select swap partition" 0 0 0 ${partitionlist}) || exit 1
-part_root=$(dialog --stdout --menu "Select root partition" 0 0 0 ${partitionlist}) || exit 1
 
 # Make and mount partitions
 echo "Making and mounting partitions"
@@ -65,9 +66,8 @@ reflector -c "LT" -f 12 -l 10 -n 12 --save /etc/pacman.d/mirrorlist
 mkdir /mnt/etc;mkdir /mnt/etc/pacman.d
 cp /etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist
 
-# Install packages
-echo "Installing packages"
-pacstrap /mnt base base-devel nano dhcpcd dhcp konsole ark dolphin discord git mpv nomacs 
+# Install base packages
+pacstrap /mnt base base-devel linux-firmware
 # Install wifi packages if wifi is available
 [[ $(ip link) == *"wlan"* ]] && pacstrap /mnt iw iwd wpa_supplicant netctl dialog
 # Install appropriate bootloader
@@ -78,18 +78,18 @@ else
 fi
 
 # Edit pacman.conf to enable multilib
-arch-chroot /mnt sed -i '92s/#[multilib]/[multilib]/' /etc/pacman.conf
-arch-chroot /mnt sed -i '93s/#Include = \/etc\/pacman.d\/mirrorlist/Include = \/etc\/pacman.d\/mirrorlist/' /etc/pacman.conf
-arch-chroot /mnt pacman -Syyu --noconfirm
+echo "[multilib]" >> /mnt/etc/pacman.conf
+echo "Include = /etc/pacman.d/mirrorlist" >> /mnt/etc/pacman.conf
+arch-chroot /mnt pacman -Syyu --noconfirm nano dhcpcd dhcp konsole ark dolphin discord git mpv nomacs
 
 # Install GPU drivers
 if [ $GPU == "radeon" ]; then
-	arch-chroot /mnt pacman -S --noconfirm linux-zen linux-zen-headers linux-firmware lib32-mesa mesa vulkan-radeon xf86-video-amdgpu
+	arch-chroot /mnt pacman -S --noconfirm linux-zen linux-zen-headers lib32-mesa mesa vulkan-radeon xf86-video-amdgpu
 elif [ $GPU == "nvidia" ]; then
-	arch-chroot /mnt pacman -S --noconfirm linux linux-headers linux-firmware nvidia lib32-nvidia-utils
+	arch-chroot /mnt pacman -S --noconfirm linux linux-headers nvidia lib32-nvidia-utils
 	arch-chroot /mnt nvidia-xconfig
 elif [ $GPU == "intel integrated" ]; then
-	arch-chroot /mnt pacman -S --noconfirm linux-zen linux-zen-headers linux-firmware mesa lib32-mesa vulkan-intel
+	arch-chroot /mnt pacman -S --noconfirm linux-zen linux-zen-headers mesa lib32-mesa vulkan-intel
 fi
 
 
@@ -147,3 +147,4 @@ cp stdout.log /mnt/home/${username}/Install_Log.log
 echo "Uncomment %wheel ALL=(ALL) ALL to add ${username} to sudoers"
 [ -s stderr.log ] && echo "Something went wrong during install, check stderr.log" \
 || echo -e "\nInstalled successfully."
+echo -e "Logs are located at /home/${username}/.\nScript's work here is done."
