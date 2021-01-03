@@ -35,9 +35,6 @@ if [ $EFI == 0 ]; then
 	sgdisk ${device} -n=1:0:+1024M -t=1:ef00
 	sgdisk ${device} -n=2:0:+${swapsize} -t=2:8200
 	sgdisk ${device} -n=3:0:0
-	part_boot=${device}1
-	part_swap=${device}2
-	part_root=${device}3
 else
 	# BIOS
 	parted ${device} mklabel gpt
@@ -45,10 +42,12 @@ else
 	sgdisk ${device} -n=2:0:+512M
 	sgdisk ${device} -n=3:0:+${swapsize} -t=3:8200
 	sgdisk ${device} -n=4:0:0
-	part_boot=${device}2
-	part_swap=${device}3
-	part_root=${device}4
 fi
+
+partitionlist=$(lsblk -plnx size -o name,size | grep ${device} | tac)
+part_boot=$(dialog --stdout --menu "Select boot partition" 0 0 0 ${partitionlist}) || exit 1
+part_swap=$(dialog --stdout --menu "Select swap partition" 0 0 0 ${partitionlist}) || exit 1
+part_root=$(dialog --stdout --menu "Select root partition" 0 0 0 ${partitionlist}) || exit 1
 
 # Make and mount partitions
 echo "Making and mounting partitions"
