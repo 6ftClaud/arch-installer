@@ -14,23 +14,22 @@ timedatectl set-ntp true
 pacman -Syyu --noconfirm dialog reflector
 
 # Setting variables
-echo -e "--- Setup ---\n"
 swapsize=$(($(cat /proc/meminfo | grep MemTotal | awk '{ print $2 }')/2000))"M"
-echo "Enter hostname:";read hostname
-echo "Enter username:";read username
-echo "Enter password:";read password
-echo "Enter password again:";read password2
+hostname=$(dialog --stdout --inputbox "Enter hostname" 0 0) || exit 1
+username=$(dialog --stdout --inputbox "Enter username" 0 0) || exit 1
+password=$(dialog --stdout --inputbox "Enter password" 0 0) || exit 1
+password2=$(dialog --stdout --inputbox "Enter password again" 0 0) || exit 1
 [[ "$password" == "$password2" ]] || ( echo "Passwords did not match"; exit 1; )
-echo "Which GPU is being used? (amd, nvidia, intel):"; read GPU
-echo "Use EFI mode? (y, n):";read EFI
+GPU=$(dialog --stdout --menu "Select which GPU drivers to install" 0 40 0 'radeon' '' 'nvidia' '' 'intel integrated' '') || exit 1
+dialog --title "Use EFI mode?" --yesno "" 0 60;EFI=$?
+clear
 
 # Partitioning disk
-echo -e "--- Disk partitioning ---\n"
 devicelist=$(lsblk -dplnx size -o name,size | grep -Ev "boot|rpmb|loop" | tac)
 device=$(dialog --stdout --menu "Select installation disk" 0 0 0 ${devicelist}) || exit 1
 
 wipefs -a ${device}
-if [ $EFI == "y" ]; then
+if [ $EFI == 0 ]; then
 	# EFI
 	parted ${device} mklabel gpt
 	sgdisk ${device} -n=1:0:+1024M -t=1:ef00
@@ -72,24 +71,24 @@ pacstrap /mnt base base-devel nano dhcpcd dhcp konsole ark dolphin discord git m
 # Install wifi packages if wifi is available
 [[ $(ip link) == *"wlan"* ]] && pacstrap /mnt iw iwd wpa_supplicant netctl dialog
 # Install appropriate bootloader
-if [ $EFI == "y"* ]; then
+if [ $EFI == 0 ]; then
 	pacstrap /mnt refind
 else
 	pacstrap /mnt grub grub-customizer
 fi
 
 # Edit pacman.conf to enable multilib
-arch-chroot /mnt sed -i '95s/#[multilib]/[multilib]/' /etc/pacman.conf
-arch-chroot /mnt sed -i '96s/#Include = \/etc\/pacman.d\/mirrorlist/Include = \/etc\/pacman.d\/mirrorlist/' /etc/pacman.conf
+arch-chroot /mnt sed -i '92s/#[multilib]/[multilib]/' /etc/pacman.conf
+arch-chroot /mnt sed -i '93s/#Include = \/etc\/pacman.d\/mirrorlist/Include = \/etc\/pacman.d\/mirrorlist/' /etc/pacman.conf
 arch-chroot /mnt pacman -Syyu --noconfirm
 
 # Install GPU drivers
-if [ $GPU == "amd" ]; then
+if [ $GPU == "radeon" ]; then
 	arch-chroot /mnt pacman -S --noconfirm linux-zen linux-zen-headers linux-firmware lib32-mesa mesa vulkan-radeon xf86-video-amdgpu
 elif [ $GPU == "nvidia" ]; then
-	arch-chroot /mnt pacman -S --noconfirm linux linux-headers linux-firmware nvidia
+	arch-chroot /mnt pacman -S --noconfirm linux linux-headers linux-firmware nvidia lib32-nvidia-utils
 	arch-chroot /mnt nvidia-xconfig
-elif [ $GPU == "intel" ]; then
+elif [ $GPU == "intel integrated" ]; then
 	arch-chroot /mnt pacman -S --noconfirm linux-zen linux-zen-headers linux-firmware mesa lib32-mesa vulkan-intel
 fi
 
@@ -135,7 +134,7 @@ arch-chroot /mnt pacman -S --noconfirm plasma sddm
 arch-chroot /mnt systemctl enable sddm
 
 # Install bootloader
-if [ $EFI == "y" ]; then
+if [ $EFI == 0 ]; then
 	arch-chroot /mnt refind-install
 else
 	arch-chroot /mnt grub-install --target=i386-pc ${device}
