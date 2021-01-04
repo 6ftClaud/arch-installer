@@ -80,7 +80,7 @@ fi
 # Edit pacman.conf to enable multilib
 echo "[multilib]" >> /mnt/etc/pacman.conf
 echo "Include = /etc/pacman.d/mirrorlist" >> /mnt/etc/pacman.conf
-arch-chroot /mnt pacman -Syyu --noconfirm nano dhcpcd dhcp konsole ark dolphin discord git mpv nomacs cronie code spotify
+arch-chroot /mnt pacman -Syyu --noconfirm nano dhcpcd dhcp konsole ark dolphin discord git mpv nomacs cronie code
 
 # Install GPU drivers
 if [ $GPU == "radeon" ]; then
