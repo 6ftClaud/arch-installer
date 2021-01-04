@@ -80,7 +80,7 @@ fi
 # Edit pacman.conf to enable multilib
 echo "[multilib]" >> /mnt/etc/pacman.conf
 echo "Include = /etc/pacman.d/mirrorlist" >> /mnt/etc/pacman.conf
-arch-chroot /mnt pacman -Syyu --noconfirm nano dhcpcd dhcp konsole ark dolphin discord git mpv nomacs cronie code
+arch-chroot /mnt pacman -Syyu --noconfirm nano dhcpcd dhcp konsole ark dolphin discord git mpv nomacs cronie code firefox
 
 # Install GPU drivers
 if [ $GPU == "radeon" ]; then
@@ -151,9 +151,7 @@ fi
 # End install
 cp stderr.log /mnt/home/${username}/Install_Errors.log
 cp stdout.log /mnt/home/${username}/Install_Log.log
-curl -L https://git.io/JLFeu > /mnt/home/${username}/aur.sh
 
-echo -e "\nLogs are located at /home/${username}/ and so is the AUR install script.\nScript's work here is done."
-
+echo -e "\nLogs are located at /home/${username}/\nScript's work here is done.\n"
 [ -s stderr.log ] && echo "Something went wrong during install, check stderr.log" \
-|| echo -e "\nInstalled successfully."
+|| echo -e "Installed successfully."
