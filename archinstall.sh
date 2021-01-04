@@ -66,10 +66,10 @@ mkdir /mnt/etc;mkdir /mnt/etc/pacman.d
 cp /etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist
 
 # Install base packages
-pacstrap /mnt base base-devel linux-firmware
+pacstrap /mnt base base-devel linux linux-headers linux-firmware
 # Install wifi packages if wifi is available
 [[ $(ip link) == *"wlan"* ]] && pacstrap /mnt iw iwd wpa_supplicant netctl dialog networkmanager \
-&& systemctl enable networkmanager
+&& arch-chroot /mnt systemctl enable NetworkManager
 # Install appropriate bootloader
 if [ $EFI == 0 ]; then
 	pacstrap /mnt refind
@@ -80,16 +80,16 @@ fi
 # Edit pacman.conf to enable multilib
 echo "[multilib]" >> /mnt/etc/pacman.conf
 echo "Include = /etc/pacman.d/mirrorlist" >> /mnt/etc/pacman.conf
-arch-chroot /mnt pacman -Syyu --noconfirm nano dhcpcd dhcp konsole ark dolphin discord git mpv nomacs
+arch-chroot /mnt pacman -Syyu --noconfirm nano dhcpcd dhcp konsole ark dolphin discord git mpv nomacs cronie code spotify
 
 # Install GPU drivers
 if [ $GPU == "radeon" ]; then
-	arch-chroot /mnt pacman -S --noconfirm linux-zen linux-zen-headers lib32-mesa mesa vulkan-radeon xf86-video-amdgpu
+	arch-chroot /mnt pacman -S --noconfirm lib32-mesa mesa vulkan-radeon xf86-video-amdgpu
 elif [ $GPU == "nvidia" ]; then
-	arch-chroot /mnt pacman -S --noconfirm linux linux-headers nvidia lib32-nvidia-utils
+	arch-chroot /mnt pacman -S --noconfirm nvidia lib32-nvidia-utils
 	arch-chroot /mnt nvidia-xconfig
 elif [ $GPU == "intel integrated" ]; then
-	arch-chroot /mnt pacman -S --noconfirm linux-zen linux-zen-headers mesa lib32-mesa vulkan-intel
+	arch-chroot /mnt pacman -S --noconfirm mesa lib32-mesa vulkan-intel
 fi
 
 
@@ -132,7 +132,7 @@ echo "root:$password" | chpasswd --root /mnt
 echo "Installing desktop environment and display manager"
 arch-chroot /mnt pacman -S --noconfirm plasma sddm
 arch-chroot /mnt systemctl enable sddm
-arch-chroot /mnt 
+
 # Install bootloader
 if [ $EFI == 0 ]; then
 	arch-chroot /mnt refind-install
@@ -149,9 +149,10 @@ fi
 # End install
 cp stderr.log /mnt/home/${username}/Install_Errors.log
 cp stdout.log /mnt/home/${username}/Install_Log.log
+curl -L https://git.io/JLFeu > /mnt/home/${username}/aur.sh
+
+echo -e "\nLogs are located at /home/${username}/ and so is the AUR install script.\nScript's work here is done."
 echo "Uncomment %wheel ALL=(ALL) ALL to add ${username} to sudoers"
+
 [ -s stderr.log ] && echo "Something went wrong during install, check stderr.log" \
 || echo -e "\nInstalled successfully."
-echo -e "Logs are located at /home/${username}/.\nScript's work here is done."
-
-echo "\"Boot with standard options\"  \"root=UUID=655dbc90-2079-4566-b8f6-3c8649d89c74\""
