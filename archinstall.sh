@@ -127,6 +127,8 @@ echo "Adding user"
 arch-chroot /mnt useradd -mU -G wheel "$username"
 echo "$username:$password" | chpasswd --root /mnt
 echo "root:$password" | chpasswd --root /mnt
+# Add user to sudoers
+echo "${username} ALL=(ALL) ALL" >> /mnt/etc/sudoers
 
 # Install desktop environment
 echo "Installing desktop environment and display manager"
@@ -152,7 +154,6 @@ cp stdout.log /mnt/home/${username}/Install_Log.log
 curl -L https://git.io/JLFeu > /mnt/home/${username}/aur.sh
 
 echo -e "\nLogs are located at /home/${username}/ and so is the AUR install script.\nScript's work here is done."
-echo "Uncomment %wheel ALL=(ALL) ALL to add ${username} to sudoers"
 
 [ -s stderr.log ] && echo "Something went wrong during install, check stderr.log" \
 || echo -e "\nInstalled successfully."
