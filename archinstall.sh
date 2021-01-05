@@ -20,6 +20,7 @@ username=$(dialog --stdout --inputbox "Enter username" 0 0) || exit 1
 password=$(dialog --stdout --inputbox "Enter password" 0 0) || exit 1
 password2=$(dialog --stdout --inputbox "Enter password again" 0 0) || exit 1
 [[ "$password" == "$password2" ]] || ( echo "Passwords did not match"; exit 1; )
+DE=$(dialog --stdout --menu "Select which Desktop Environment to install" 0 40 0 'KDE' '' 'Gnome' '' 'LXDE' '' 'Xfce' '') || exit 1
 GPU=$(dialog --stdout --menu "Select which GPU drivers to install" 0 40 0 'radeon' '' 'nvidia' '' 'intel integrated' '') || exit 1
 dialog --title "Use EFI mode?" --yesno "" 0 60;EFI=$?
 clear
@@ -131,8 +132,19 @@ echo "root:$password" | chpasswd --root /mnt
 echo "${username} ALL=(ALL) ALL" >> /mnt/etc/sudoers
 
 # Install desktop environment
-echo "Installing desktop environment and display manager"
-arch-chroot /mnt pacman -S --noconfirm plasma sddm
+echo "Installing desktop environment"
+if [ $DE == "KDE" ]; then
+	arch-chroot /mnt pacman -S --noconfirm plasma
+else if [ $DE == "Gnome"]; then
+	arch-chroot /mnt pacman -S --noconfirm gnome
+else if [ $DE == "LXDE"]; then
+	arch-chroot /mnt pacman -S --noconfirm lxde-gtk3
+else if [ $DE == "Xfce"]; then
+	arch-chroot /mnt pacman -S --noconfirm xfce4
+fi
+
+echo "Installing login manager"
+arch-chroot /mnt pacman -S --noconfirm sddm
 arch-chroot /mnt systemctl enable sddm
 
 # Install bootloader
