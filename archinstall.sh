@@ -20,8 +20,8 @@ username=$(dialog --stdout --inputbox "Enter username" 0 0) || exit 1
 password=$(dialog --stdout --inputbox "Enter password" 0 0) || exit 1
 password2=$(dialog --stdout --inputbox "Enter password again" 0 0) || exit 1
 [[ "$password" == "$password2" ]] || ( echo "Passwords did not match"; exit 1; )
-DE=$(dialog --stdout --menu "Select which Desktop Environment to install" 0 40 0 'KDE' '' 'Gnome' '' 'LXDE' '' 'Xfce' '') || exit 1
-GPU=$(dialog --stdout --menu "Select which GPU drivers to install" 0 40 0 'radeon' '' 'nvidia' '' 'intel integrated' '') || exit 1
+DE=$(dialog --stdout --menu "Select which Desktop Environment to install" 0 60 0 'KDE' '' 'Gnome' '' 'LXDE' '' 'Xfce' '' 'none' '') || exit 1
+GPU=$(dialog --stdout --menu "Select which GPU drivers to install" 0 60 0 'radeon' '' 'nvidia' '' 'intel integrated' '' 'none' '') || exit 1
 dialog --title "Use EFI mode?" --yesno "" 0 60;EFI=$?
 clear
 
@@ -81,7 +81,7 @@ fi
 # Edit pacman.conf to enable multilib
 echo "[multilib]" >> /mnt/etc/pacman.conf
 echo "Include = /etc/pacman.d/mirrorlist" >> /mnt/etc/pacman.conf
-arch-chroot /mnt pacman -Syyu --noconfirm nano dhcpcd dhcp konsole ark dolphin discord git mpv nomacs cronie code firefox
+arch-chroot /mnt pacman -Syyu --noconfirm nano dhcpcd dhcp discord git mpv nomacs cronie code firefox
 
 # Install GPU drivers
 if [ $GPU == "radeon" ]; then
@@ -134,7 +134,7 @@ echo "${username} ALL=(ALL) ALL" >> /mnt/etc/sudoers
 # Install desktop environment
 echo "Installing desktop environment"
 if [ $DE == "KDE" ]; then
-	arch-chroot /mnt pacman -S --noconfirm plasma
+	arch-chroot /mnt pacman -S --noconfirm plasma konsole ark dolphin
 else if [ $DE == "Gnome"]; then
 	arch-chroot /mnt pacman -S --noconfirm gnome
 else if [ $DE == "LXDE"]; then
